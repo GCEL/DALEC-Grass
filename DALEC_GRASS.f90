@@ -42,7 +42,8 @@
 !         *13.Forest mgmt after clearing
 !         *14.Mean T
 !
-! * : not used / empty 
+! * not used / empty 
+! * code cannot be used on spatial mode (met driver #8)
 ! -----------------------------------------------------------------------------------------------------------
 
 module CARBON_MODEL_MOD
