@@ -1,4 +1,3 @@
-! grassland model developed on DALEC_GIS_DFOL_FR
 ! -----------------------------------------------------------------------------------------------------------
 ! POOLS:   1.labile 2.foliar 3.root                        ! PARAMETERS:
 !         *4.wood   5.litter 6.som                         !
@@ -43,17 +42,13 @@
 !         *14.Mean T
 !
 ! * not used / empty 
-! * code cannot be used on spatial mode (met driver #8)
+! * this code cannot be used on spatial mode (met driver #8)
 ! -----------------------------------------------------------------------------------------------------------
 
 module CARBON_MODEL_MOD
 
 implicit none
 
-! make all private
-! private
-
-! explicit publics
 public :: CARBON_MODEL           &
          ,acm                    &
          ,linear_model_gradient  
@@ -116,10 +111,6 @@ contains
 
     double precision, intent(out) :: REMOVED_C(2,nodays) ! vector of removed C (grazed,cut)
     
-    !f2py intent(in) :: start, finish, deltat, lat, met, pars, nodays, nopars, nomet, nopools, nofluxes, version_code   
-
-    !f2py intent(out) :: LAI, GPP, NEE, POOLS, FLUXES, REMOVED_C
-
     ! declare general local variables
     double precision :: gpppars(12)        & ! ACM inputs (LAI+met)
                        ,constants(10)        ! parameters for ACM
@@ -139,7 +130,6 @@ contains
 
     integer :: gsi_lag
 
-    ! load some values
     gpppars(4) = 2.0  ! g N leaf_m-2
     gpppars(7) = lat
     gpppars(9) = -2.0 ! leafWP-soilWP
@@ -173,24 +163,15 @@ contains
         POOLS(1,5) = pars(19)
         POOLS(1,6) = pars(30)
 
-        ! calculate some values once as these are invarient between DALEC runs
         if (.not.allocated(tmp_x)) then
-            ! 21 days is the maximum potential so we will fill the maximum potential
-            ! + 1 for safety
             allocate(tmp_x(22),tmp_m(nodays))
             do f = 1, 22
                tmp_x(f) = f
             end do
             do n = 1, nodays
-              ! calculate the gradient / trend of GSI
               if (sum(deltat(1:n)) < 21) then
                   tmp_m(n) = n-1
               else
-                 ! else we will try and work out the gradient to see what is happening
-                 ! to the system over all. The default assumption will be to consider
-                 ! the averaging period of GSI model (i.e. 21 days). If this is not
-                 ! possible either the time step of the system is used (if step greater
-                 ! than 21 days) or all available steps (if n < 21).
                  m = 0 ; test = 0
                  do while (test < 21)
                     m=m+1 ; test = sum(deltat((n-m):n))
@@ -199,19 +180,16 @@ contains
                     endif
                  end do
                  tmp_m(n) = m
-               endif ! for calculating gradient
-            end do ! calc daily values once
-            ! allocate GSI history dimension
+               endif 
+            end do
             gsi_lag_remembered = max(2,maxval(nint(tmp_m)))
-        end if ! .not.allocated(tmp_x)
-        ! assign our starting value
+        end if
         gsi_history = pars(24)-1d0
         just_grown = pars(25)
 
-    endif ! start == 1
+    endif 
 
-    ! assign climate sensitivities
-    gsi_lag = gsi_lag_remembered ! added to prevent loss from memory
+    gsi_lag = gsi_lag_remembered 
     fol_turn_crit=pars(24)-1d0
     lab_turn_crit=pars(3)-1d0
 
@@ -291,11 +269,8 @@ contains
       ! calculate and store the GSI index
       FLUXES(n,18) = Tfac * Photofac * VPDfac
 
-      ! we will load up some needed variables
       m = tmp_m(n)
-      ! update gsi_history for the calculation
       if (n == 1) then
-          ! in first step only we want to take the initial GSI value only
           gsi_history(gsi_lag) = FLUXES(n,18)
       else
           gsi_history((gsi_lag-m):gsi_lag) = FLUXES((n-m):n,18)
@@ -314,11 +289,10 @@ contains
        
       gsi_lag_remembered = gsi_lag
 
-      ! first assume that nothing is happening
       FLUXES(n,9) = 0d0  ! leaf turnover
       FLUXES(n,16) = 0d0 ! leaf growth
 
-      ! now update foliage and labile conditions based on gradient calculations
+      ! update foliage and labile conditions based on gradient calculations
       if (gradient < fol_turn_crit .or. FLUXES(n,18) == 0) then
          ! we are in a decending condition so foliar turnover
          FLUXES(n,9) = pars(5)*(1.0-FLUXES(n,18))
@@ -338,27 +312,18 @@ contains
              FLUXES(n,16) = 0d0
          endif
       else
-         ! probaly we want nothing to happen, however if we are at the seasonal
-         ! maximum we will consider further growth still
+
          if (just_grown >= 1.0) then
-            ! we are between so definitely not losing foliage and we have
-            ! previously been growing so maybe we still have a marginal return on
-            ! doing so again
             FLUXES(n,16) = pars(11)*FLUXES(n,18)
-            ! but possibly gaining some?
-            ! determine if this is a good idea based on GPP increment
             tmp = POOLS(n,1)*(1d0-(1d0-FLUXES(n,16))**deltat(n))/deltat(n)
             tmp = (POOLS(n,2)+tmp)/pars(15)
             gpppars(1)=tmp
             tmp = acm(gpppars,constants)
-            ! determine if increase in LAI leads to an improvement in GPP greater
-            ! than critical value, if not then no labile turnover allowed
             if ( ((tmp - FLUXES(n,1))/FLUXES(n,1)) < pars(23) ) then
                 FLUXES(n,16) = 0d0
             endif
-         end if ! Just grown?
-      endif ! gradient choice
-
+         end if 
+      endif 
 
       ! FLUXES WITH TIME DEPENDENCIES
 
@@ -371,7 +336,7 @@ contains
       !  root litter production = P_root * (1-(1-rootTOR)**deltat)/deltat  
       FLUXES(n,12) = POOLS(n,3)*(1.-(1.-pars(6))**deltat(n))/deltat(n)
 
-      ! FLUXES WITH TEMP AND TIME DEPENDENCIES
+      ! FLUXES WITH TEMPERATURE AND TIME DEPENDENCIES
 
       ! resp het litter = P_litter * (1-(1-GPP_respired*litterTOR)**deltat)/deltat  
       FLUXES(n,13) = POOLS(n,5)*(1.-(1.-FLUXES(n,2)*pars(7))**deltat(n))/deltat(n)
@@ -401,19 +366,15 @@ contains
       POOLS(n+1,6) = POOLS(n,6) + (FLUXES(n,15)-FLUXES(n,14)+FLUXES(n,11))*deltat(n)
 
 
-      ! 
-      ! FIELD MODE 
-      ! 
-
       if (version_code .EQ. 2) then 
 
-        ! CUTTING (if : AGB > cutting limit & met(8,n) = 100 i.e. cutting code)
+        ! CUTTING (if : AGB > cutting limit & met(8,n) = 100)
         if ( ((POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(28)*0.475*0.1)) .AND. (met(8,n) .EQ. 100) ) then
                                                                    
             ! direct C losses
             labile_loss  = POOLS(n+1,1) * pars(33)
             foliar_loss  = max(0.,POOLS(n+1,2) - (pars(27)*0.475*0.1 + labile_loss))
-            roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
+            roots_loss   = 0 
 
             ! fraction of harvest wasted 
             labile_residue = labile_loss * labile_frac_res
@@ -506,11 +467,11 @@ contains
 
             endif 
 
-        endif ! end grazing process
+        endif 
       
-      endif ! end version_code check 
+      endif
 
-    end do ! nodays loop
+    end do
 
 
   end subroutine CARBON_MODEL
@@ -527,11 +488,9 @@ contains
 
     implicit none
 
-    ! declare input variables
-    double precision, intent(in) :: drivers(12) & ! acm input requirements
+    double precision, intent(in) :: drivers(12) & ! ACM inputs
                                    ,constants(10) ! ACM parameters
 
-    ! declare local variables
     double precision :: gc, pn, pd, pp, qq, ci, e0, dayl, cps, dec, nit &
                        ,trange, sinld, cosld,aob  &
                        ,mint,maxt,radiation,co2,lai,doy,lat &
@@ -539,10 +498,8 @@ contains
                        ,dayl_const,hydraulic_exponent,hydraulic_temp_coef &
                        ,co2_comp_point,co2_half_sat,lai_coef,lai_const
 
-    ! initial values
     gc=0.0 ; pp=0.0 ; qq=0.0 ; ci=0.0 ; e0=0.0 ; dayl=0.0 ; cps=0.0 ; dec=0.0 ; nit=1.0
 
-    ! load driver values to correct local vars
     lai  = drivers(1)
     maxt = drivers(2)
     mint = drivers(3)
@@ -554,7 +511,6 @@ contains
     deltaWP = drivers(9)
     Rtot = drivers(10)
 
-    ! load parameters into correct local vars
     NUE = constants(1)
     dayl_coef = constants(2)
     co2_comp_point = constants(3) 
