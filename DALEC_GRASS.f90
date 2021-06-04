@@ -1,4 +1,5 @@
-! -----------------------------------------------------------------------------------------------------------
+! grassland model developed from DALEC_GIS_DFOL_FR
+! ----------------------------------------------------------------------------------------------------------------
 ! POOLS:   1.labile 2.foliar 3.root                        ! PARAMETERS:
 !         *4.wood   5.litter 6.som                         !
 ! ------------------------------------------               ! 1.Decomposition rate
@@ -31,24 +32,30 @@
 !          5.CO2 (ppm)                                     ! 28.DM min lim for cutting (kg.DM.ha-1)
 !          6.DOY                                           ! 29.leaf-vs-stem allocation factor 
 !         *7.lagged precip                                 ! 30.C SOM (initialization)
-!          8.cutting/grazing :                             ! 31.DM demand % of animal weight
-!            - spatial mode = lai removed (m2.m-2)         ! 32.Post-grazing labile loss
-!            - field mode = LSU.ha-1                       ! 33.Post-cut labile loss 
-!         *9.burnt area fraction                           
+!          8.cutting/grazing :                             ! 31.DM demand of animal weight (fraction)
+!            - spatial mode = lai removed (m2.m-2)         ! 32.Post-grazing labile loss (fraction)
+!            - field mode = LSU.ha-1                       ! 33.Post-cut labile loss (fraction)
+!         *9.burnt area fraction                           ! 34.Cut detection parameter (LAI reduction m2.m-2 see met(8))
 !          10.21-day avg min T (K)        
 !          11.21-day avg photoperiod (sec) 
 !          12.21-day avg VPD (Pa)         
 !         *13.Forest mgmt after clearing
 !         *14.Mean T
-!
-! * not used / empty 
-! * this code cannot be used on spatial mode (met driver #8)
-! -----------------------------------------------------------------------------------------------------------
+! ----------------------------------------------------------------------------------------------------------------
+! NOTES : '*' above means not used/applicable for grasslands 
+!         1 LSU per ha = 1 cow that weighs 650kg and grazes on 1 ha of grassland 
+!         carbon = 0.475 * dry matter 
+!         1 g.C.m-2 = 1 * 0.021 t.DM.ha-1
+! ----------------------------------------------------------------------------------------------------------------
 
 module CARBON_MODEL_MOD
 
 implicit none
 
+! make all private
+! private
+
+! explicit publics
 public :: CARBON_MODEL           &
          ,acm                    &
          ,linear_model_gradient  
@@ -61,7 +68,7 @@ double precision, parameter :: deg_to_rad = pi/180d0
 double precision :: Tfac,Photofac,VPDfac        & ! oC, seconds, Pa
                    ,tmp,gradient                & 
                    ,fol_turn_crit,lab_turn_crit &
-                   ,gsi_history(22),just_grown
+                   ,gsi_history(22),just_grown,LMA
 
 integer :: gsi_lag_remembered 
 
@@ -111,6 +118,13 @@ contains
 
     double precision, intent(out) :: REMOVED_C(2,nodays) ! vector of removed C (grazed,cut)
     
+    ! following two lines needed to compile this .f90 into a python-readable .so 
+    ! compile by running 'f2py -c DALEC_GRASS.f90 -m DALEC_GRASS' 
+
+    !f2py intent(in) :: start, finish, deltat, lat, met, pars, nodays, nopars, nomet, nopools, nofluxes, version_code   
+
+    !f2py intent(out) :: LAI, GPP, NEE, POOLS, FLUXES, REMOVED_C
+
     ! declare general local variables
     double precision :: gpppars(12)        & ! ACM inputs (LAI+met)
                        ,constants(10)        ! parameters for ACM
@@ -130,10 +144,11 @@ contains
 
     integer :: gsi_lag
 
+    ! load some values
     gpppars(4) = 2.0  ! g N leaf_m-2
     gpppars(7) = lat
     gpppars(9) = -2.0 ! leafWP-soilWP
-    gpppars(10) = 1.0 ! hydraulic resistance
+    gpppars(10) = 1.0 ! totaly hydraulic resistance
     gpppars(11) = pi
 
     ! assign acm parameters
@@ -159,19 +174,28 @@ contains
         POOLS(1,1) = pars(16)
         POOLS(1,2) = pars(17)
         POOLS(1,3) = pars(18)
-        POOLS(1,4) = 0 ! no wood in grasslands
+        POOLS(1,4) = 0 ! no wood pools in grasslands
         POOLS(1,5) = pars(19)
         POOLS(1,6) = pars(30)
 
+        ! calculate some values once as these are invarient between DALEC runs
         if (.not.allocated(tmp_x)) then
+            ! 21 days is the maximum potential so we will fill the maximum potential
+            ! + 1 for safety
             allocate(tmp_x(22),tmp_m(nodays))
             do f = 1, 22
                tmp_x(f) = f
             end do
             do n = 1, nodays
+              ! calculate the gradient / trend of GSI
               if (sum(deltat(1:n)) < 21) then
                   tmp_m(n) = n-1
               else
+                 ! else we will try and work out the gradient to see what is happening
+                 ! to the system over all. The default assumption will be to consider
+                 ! the averaging period of GSI model (i.e. 21 days). If this is not
+                 ! possible either the time step of the system is used (if step greater
+                 ! than 21 days) or all available steps (if n < 21).
                  m = 0 ; test = 0
                  do while (test < 21)
                     m=m+1 ; test = sum(deltat((n-m):n))
@@ -180,16 +204,19 @@ contains
                     endif
                  end do
                  tmp_m(n) = m
-               endif 
-            end do
+               endif ! for calculating gradient
+            end do ! calc daily values once
+            ! allocate GSI history dimension
             gsi_lag_remembered = max(2,maxval(nint(tmp_m)))
-        end if
+        end if ! .not.allocated(tmp_x)
+        ! assign our starting value
         gsi_history = pars(24)-1d0
         just_grown = pars(25)
 
-    endif 
+    endif ! start == 1
 
-    gsi_lag = gsi_lag_remembered 
+    ! assign climate sensitivities
+    gsi_lag = gsi_lag_remembered ! added to prevent loss from memory
     fol_turn_crit=pars(24)-1d0
     lab_turn_crit=pars(3)-1d0
 
@@ -197,10 +224,13 @@ contains
     ! Begin looping through each time step
     ! 
 
-    do n = start, finish
-      
+    do n = start, finish  
+
       ! calculate LAI value
-      LAI(n) = POOLS(n,2) / pars(15)
+      
+      ! fixed LMA :
+      LMA = pars(15)
+      LAI(n) = POOLS(n,2) / LMA 
 
       ! load next met / lai values for ACM
       gpppars(1)=LAI(n)   ! LAI
@@ -226,26 +256,32 @@ contains
       ! NPP 
       NPP = FLUXES(n,1) - FLUXES(n,3)
       
-      ! fraction for allocation to roots
+      ! dynamic allocation to roots vs aboveground biomass after Reyes.et.al.2017 (10.1002/2017MS001022)
+      ! min/max allocation to roots as fraction of NPP
       f_root = 1 - exp(-1*pars(4)*LAI(n))
-      if (f_root < 0.2) then
-         f_root = 0.2
+      if (f_root < 0.1) then  
+         f_root = 0.1
       endif
-      if (f_root > 0.8) then 
-         f_root = 0.8
+      if (f_root > 0.7) then  
+         f_root = 0.7
       endif
       
       ! allocation to roots 
       FLUXES(n,6) = NPP * f_root
+      ! FLUXES(n,6) = NPP * pars(4)
       
       ! C left for aboveground allocation                        
       FLUXES(n,7) = NPP - FLUXES(n,6)               
       
-      ! allocation of ABG C to leaf   
+      ! allocation of ABG C to leaves   
+      ! FLUXES(n,4) = FLUXES(n,7) * 0.90 
       FLUXES(n,4) = FLUXES(n,7) * (1 - (pars(29)*(LAI(n)/6)))
+      ! FLUXES(n,4) = FLUXES(n,7) * (1-pars(29))
       
-      ! allocation of ABG C to labile/stem              
+      ! allocation of ABG C to labile/stem using pars(26)
+      ! Ostrem.et.al.2013 (10.1080/09064710.2013.819440)            
       FLUXES(n,5) = FLUXES(n,7) * (pars(29)*(LAI(n)/6))
+      ! FLUXES(n,5) = FLUXES(n,7) * (pars(29))              
       
       ! labile consumption
       FLUXES(n,8) = 0.0
@@ -256,7 +292,8 @@ contains
       ! vapour pressure deficit that grow linearly from 0 to 1 between a calibrated 
       ! min and max value. Photoperiod, VPD and avgTmin are direct input
 
-      ! temperature limitation
+      ! temperature limitation, then restrict to 0-1; correction for k-> oC
+      ! Tfac = (met(10,n)-(pars(12)-273.15)) / (pars(13)-pars(12)) ! no need to K->C 
       Tfac = ( met(10,n)-pars(12)) / (pars(13)-pars(12) )
       Tfac = min(1d0,max(0d0,Tfac))
       ! photoperiod limitation
@@ -269,8 +306,11 @@ contains
       ! calculate and store the GSI index
       FLUXES(n,18) = Tfac * Photofac * VPDfac
 
+      ! we will load up some needed variables
       m = tmp_m(n)
+      ! update gsi_history for the calculation
       if (n == 1) then
+          ! in first step only we want to take the initial GSI value only
           gsi_history(gsi_lag) = FLUXES(n,18)
       else
           gsi_history((gsi_lag-m):gsi_lag) = FLUXES((n-m):n,18)
@@ -289,10 +329,11 @@ contains
        
       gsi_lag_remembered = gsi_lag
 
+      ! first assume that nothing is happening
       FLUXES(n,9) = 0d0  ! leaf turnover
       FLUXES(n,16) = 0d0 ! leaf growth
 
-      ! update foliage and labile conditions based on gradient calculations
+      ! now update foliage and labile conditions based on gradient calculations
       if (gradient < fol_turn_crit .or. FLUXES(n,18) == 0) then
          ! we are in a decending condition so foliar turnover
          FLUXES(n,9) = pars(5)*(1.0-FLUXES(n,18))
@@ -303,7 +344,7 @@ contains
          just_grown = 1.5
          ! check carbon return
          tmp = POOLS(n,1)*(1d0-(1d0-FLUXES(n,16))**deltat(n))/deltat(n)
-         tmp = (POOLS(n,2)+tmp)/pars(15)
+         tmp = (POOLS(n,2)+tmp)/LMA
          gpppars(1)=tmp
          tmp = acm(gpppars,constants)
          ! determine if increase in LAI leads to an improvement in GPP greater
@@ -312,18 +353,27 @@ contains
              FLUXES(n,16) = 0d0
          endif
       else
-
+         ! probaly we want nothing to happen, however if we are at the seasonal
+         ! maximum we will consider further growth still
          if (just_grown >= 1.0) then
+            ! we are between so definitely not losing foliage and we have
+            ! previously been growing so maybe we still have a marginal return on
+            ! doing so again
             FLUXES(n,16) = pars(11)*FLUXES(n,18)
+            ! but possibly gaining some?
+            ! determine if this is a good idea based on GPP increment
             tmp = POOLS(n,1)*(1d0-(1d0-FLUXES(n,16))**deltat(n))/deltat(n)
-            tmp = (POOLS(n,2)+tmp)/pars(15)
+            tmp = (POOLS(n,2)+tmp)/LMA
             gpppars(1)=tmp
             tmp = acm(gpppars,constants)
+            ! determine if increase in LAI leads to an improvement in GPP greater
+            ! than critical value, if not then no labile turnover allowed
             if ( ((tmp - FLUXES(n,1))/FLUXES(n,1)) < pars(23) ) then
                 FLUXES(n,16) = 0d0
             endif
-         end if 
-      endif 
+         end if ! Just grown?
+      endif ! gradient choice
+
 
       ! FLUXES WITH TIME DEPENDENCIES
 
@@ -336,7 +386,7 @@ contains
       !  root litter production = P_root * (1-(1-rootTOR)**deltat)/deltat  
       FLUXES(n,12) = POOLS(n,3)*(1.-(1.-pars(6))**deltat(n))/deltat(n)
 
-      ! FLUXES WITH TEMPERATURE AND TIME DEPENDENCIES
+      ! FLUXES WITH TEMP AND TIME DEPENDENCIES
 
       ! resp het litter = P_litter * (1-(1-GPP_respired*litterTOR)**deltat)/deltat  
       FLUXES(n,13) = POOLS(n,5)*(1.-(1.-FLUXES(n,2)*pars(7))**deltat(n))/deltat(n)
@@ -345,7 +395,7 @@ contains
       ! litter to som = P_litter * (1-(1-dec_rate*temprate)**deltat)/deltat
       FLUXES(n,15) = POOLS(n,5)*(1.-(1.-pars(1)*FLUXES(n,2))**deltat(n))/deltat(n)
 
-      ! NEE = resp_auto + resp_het_litter + resp_het_som - GPP
+      ! NEE = resp_auto + resp_het_litter + resp_het_som - GPP [i.e. '-' when CO2 sink '+' when CO2 source ]
       NEE(n) = (FLUXES(n,3) + FLUXES(n,13) + FLUXES(n,14)) - FLUXES(n,1)
       ! GPP 
       GPP(n) = FLUXES(n,1)
@@ -366,15 +416,150 @@ contains
       POOLS(n+1,6) = POOLS(n,6) + (FLUXES(n,15)-FLUXES(n,14)+FLUXES(n,11))*deltat(n)
 
 
+      ! 
+      ! SPATIAL MODE 
+      ! 
+
+      if (version_code .EQ. 1) then 
+
+        ! CUTTING 
+
+        !if current ABG biomass > pre-cutting limit & is between April-October & LAI reduction driver > pars(34) & no cut in previous month
+        if ( ( (POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(28)*0.475*0.1) )  & 
+             .AND. ( met(6,n) .GE. 90 ) .AND. ( met(6,n) .LE. 304 ) & 
+             .AND. ( met(8,n) .GE. pars(34) ) &
+             .AND. (REMOVED_C(2,n-1) .EQ. 0.0) .AND. (REMOVED_C(2,n-2) .EQ. 0.0 ) &
+             .AND. (REMOVED_C(2,n-3) .EQ. 0.0) .AND. (REMOVED_C(2,n-4) .EQ. 0.0 ) ) then
+
+            ! direct C losses
+            labile_loss  = POOLS(n+1,1) * pars(33)
+            ! foliar_loss  = max(0.,POOLS(n+1,2) - (pars(27)*0.475*0.1 + labile_loss))
+            foliar_loss  = POOLS(n+1,2) * 0.95 ! 95% of leaves lost after cutting probably 99% lost in reality 
+            roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death ! allocation to roots will be reduced due to reduced LAI 
+
+            ! fraction of harvest wasted 
+            labile_residue = labile_loss * labile_frac_res
+            foliar_residue = foliar_loss * foliage_frac_res
+             
+            ! if havest yields > 1500 kg.DM.ha-1 then proceed with cut 
+            if ( ((foliar_loss-foliar_residue)+(labile_loss-labile_residue)) .GE. (1500*0.475*0.1) ) then
+              
+              ! extracted carbon via cutting
+              REMOVED_C(2,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue)
+
+              ! update pools 
+              POOLS(n+1,1) = max(0.,POOLS(n+1,1)-labile_loss)
+              POOLS(n+1,2) = max(0.,POOLS(n+1,2)-foliar_loss)
+              POOLS(n+1,3) = max(0.,POOLS(n+1,3)-roots_loss)
+              POOLS(n+1,4) = 0.0
+              POOLS(n+1,5) = max(0., POOLS(n+1,5) + (labile_residue+foliar_residue+roots_loss))
+              POOLS(n+1,6) = max(0., POOLS(n+1,6))
+
+            endif 
+
+        endif ! end cutting process   
+
+        ! GRAZING 
+
+        ! if LAI reduction driver > 0 & ABG biomass > pre-grazing limit & no cutting this, 1 and 2 weeks before
+        if ( (met(8,n) > 0.) .AND. ( (POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(27)*0.475*0.1) ) & 
+            .AND. (REMOVED_C(2,n) .EQ. 0.0) .AND. (REMOVED_C(2,n-1) .EQ. 0.0) .AND. (REMOVED_C(2,n-2) .EQ. 0.0) ) then
+            
+            ! direct C losses
+            labile_loss  = POOLS(n+1,1) * pars(32)
+            foliar_loss  = max(0.,met(8,n) * LMA - labile_loss)
+            roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
+
+            ! fraction of harvest wasted 
+            labile_residue = labile_loss * labile_frac_res
+            foliar_residue = foliar_loss * foliage_frac_res
+
+            ! extracted C via grazing (if remaining ABG biomass > pre-grazing limit DM & grazed biomass > ~0.5g.C.m-2 )
+            ! minimum grazed biomass based on North Wyke data (winter sheep grazing)            
+            if ( (((POOLS(n+1,2)+POOLS(n+1,1))-foliar_loss-labile_loss) .GE. (pars(27)*0.475*0.1)) & 
+                .AND. ((foliar_loss+labile_loss) .GE. pars(35)) ) then
+                
+                ! extracted C via grazing
+                REMOVED_C(1,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue)
+                 
+                ! constants used for animal C fluxes based on various studies 
+                ! incl Vertes.et.al.2019 (10.1016/B978-0-12-811050-8.00002-9)
+                
+                ! animal manure-C production
+                FLUXES(n,19) = REMOVED_C(1,n) * 0.32
+                
+                ! animal respiration CO2-C
+                FLUXES(n,20) = REMOVED_C(1,n) * 0.54 
+
+                ! animal CH4-C 
+                FLUXES(n,21) = REMOVED_C(1,n) * 0.04 
+
+                ! update pools 
+                POOLS(n+1,1) = max(0.,POOLS(n+1,1)-labile_loss)
+                POOLS(n+1,2) = max(0.,POOLS(n+1,2)-foliar_loss)
+                POOLS(n+1,3) = max(0.,POOLS(n+1,3)-roots_loss)
+                POOLS(n+1,4) = 0.0
+                POOLS(n+1,5) = max(0., POOLS(n+1,5) + (labile_residue+foliar_residue+roots_loss) + FLUXES(n,19))
+                POOLS(n+1,6) = max(0., POOLS(n+1,6))
+            endif 
+
+            ! extracted C via grazing (if not done above & remaining ABG biomass < pre-grazing limit DM )
+            if ( (REMOVED_C(1,n) .EQ. 0.0) .AND. & 
+               (((POOLS(n+1,2)+POOLS(n+1,1))-foliar_loss-labile_loss) .LE. (pars(27)*0.475*0.1)) ) then
+                
+                ! direct C losses
+                labile_loss  = POOLS(n+1,1) * pars(32)
+                foliar_loss  = POOLS(n+1,2) - (pars(27)*0.475*0.1 + labile_loss)
+                roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
+
+                ! proceed if simulating this grazing will lead to > ~0.5 gCm-2 removed from ABG pool 
+                if ((foliar_loss+labile_loss) .GE. pars(35)) then
+
+                  ! fraction of harvest wasted 
+                  labile_residue = labile_loss * labile_frac_res
+                  foliar_residue = foliar_loss * foliage_frac_res
+
+                  ! extracted carbon via grazing
+                  REMOVED_C(1,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue)
+
+                  ! animal manure-C production
+                  FLUXES(n,19) = REMOVED_C(1,n) * 0.32
+                  
+                  ! animal respiration CO2-C
+                  FLUXES(n,20) = REMOVED_C(1,n) * 0.54 
+
+                  ! animal CH4-C 
+                  FLUXES(n,21) = REMOVED_C(1,n) * 0.04 
+
+                  ! update pools 
+                  POOLS(n+1,1) = max(0.,POOLS(n+1,1)-labile_loss)
+                  POOLS(n+1,2) = max(0.,POOLS(n+1,2)-foliar_loss)
+                  POOLS(n+1,3) = max(0.,POOLS(n+1,3)-roots_loss)
+                  POOLS(n+1,4) = 0.0
+                  POOLS(n+1,5) = max(0., POOLS(n+1,5) + (labile_residue+foliar_residue+roots_loss) + FLUXES(n,19) )
+                  POOLS(n+1,6) = max(0., POOLS(n+1,6))
+                endif 
+
+            endif 
+
+        endif ! end grazing process
+      
+      endif ! end version_code check 
+
+
+      ! 
+      ! FIELD MODE 
+      ! 
+
       if (version_code .EQ. 2) then 
 
-        ! CUTTING (if : AGB > cutting limit & met(8,n) = 100)
+        ! CUTTING (if : AGB > cutting limit & met(8,n) = 100 i.e. cutting code)
         if ( ((POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(28)*0.475*0.1)) .AND. (met(8,n) .EQ. 100) ) then
                                                                    
             ! direct C losses
             labile_loss  = POOLS(n+1,1) * pars(33)
             foliar_loss  = max(0.,POOLS(n+1,2) - (pars(27)*0.475*0.1 + labile_loss))
-            roots_loss   = 0 
+            roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
 
             ! fraction of harvest wasted 
             labile_residue = labile_loss * labile_frac_res
@@ -394,7 +579,7 @@ contains
         endif ! end cutting 
 
         ! GRAZING (if LSU.ha-1 > 0 & AGB > limit )
-        if ( (met(8,n) > 0.) .AND. (met(8,n) .NE. 100 ) .AND. ((POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(27)*0.475*0.1)) ) then
+        if ( (met(8,n) > 0.0) .AND. (met(8,n) .NE. 100 ) .AND. ((POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(27)*0.475*0.1)) ) then
             
             ! direct C losses
             labile_loss  = POOLS(n+1,1) * pars(32)
@@ -438,7 +623,7 @@ contains
                 foliar_loss  = POOLS(n+1,2) - (pars(27)*0.475*0.1 + labile_loss)
                 roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
 
-                if (foliar_loss > 0.0 ) then
+                if (foliar_loss > 0.1 ) then
 
                   ! fraction of harvest wasted 
                   labile_residue = labile_loss * labile_frac_res
@@ -467,11 +652,12 @@ contains
 
             endif 
 
-        endif 
+        endif ! end grazing process
       
-      endif
+      endif ! end version_code check 
 
-    end do
+
+    end do ! nodays loop
 
 
   end subroutine CARBON_MODEL
@@ -488,9 +674,11 @@ contains
 
     implicit none
 
-    double precision, intent(in) :: drivers(12) & ! ACM inputs
+    ! declare input variables
+    double precision, intent(in) :: drivers(12) & ! acm input requirements
                                    ,constants(10) ! ACM parameters
 
+    ! declare local variables
     double precision :: gc, pn, pd, pp, qq, ci, e0, dayl, cps, dec, nit &
                        ,trange, sinld, cosld,aob  &
                        ,mint,maxt,radiation,co2,lai,doy,lat &
@@ -498,8 +686,10 @@ contains
                        ,dayl_const,hydraulic_exponent,hydraulic_temp_coef &
                        ,co2_comp_point,co2_half_sat,lai_coef,lai_const
 
+    ! initial values
     gc=0.0 ; pp=0.0 ; qq=0.0 ; ci=0.0 ; e0=0.0 ; dayl=0.0 ; cps=0.0 ; dec=0.0 ; nit=1.0
 
+    ! load driver values to correct local vars
     lai  = drivers(1)
     maxt = drivers(2)
     mint = drivers(3)
@@ -511,6 +701,7 @@ contains
     deltaWP = drivers(9)
     Rtot = drivers(10)
 
+    ! load parameters into correct local vars
     NUE = constants(1)
     dayl_coef = constants(2)
     co2_comp_point = constants(3) 
@@ -529,7 +720,8 @@ contains
     ! maximum rate of temperature and nitrogen (canopy efficiency) limited photosynthesis (gC.m-2.day-1)
     pn = lai*nit*NUE*exp(temp_exponent*maxt)
     ! pp and qq represent limitation by diffusion and metabolites respecitively
-    pp = pn/gc ; qq = co2_comp_point-co2_half_sat
+    pp = pn/gc 
+    qq = co2_comp_point-co2_half_sat
     ! calculate internal CO2 concentration (ppm)
     ci = 0.5*(co2+qq-pp+sqrt(((co2+qq-pp)*(co2+qq-pp))-4.0*(co2*qq-pp*co2_comp_point)))
     ! limit maximum quantium efficiency by leaf area, hyperbola
