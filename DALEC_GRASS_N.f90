@@ -1,9 +1,9 @@
-! Grassland biogeochemistry model 
-! Development version that includes Nitrogen cycling 
+! a first take on a DALEC-Grass version with N cycling 
+! using tissue C:N ratios to calculate N pools and fluxes
 ! ----------------------------------------------------------------------------------------------------------------
 ! POOLS: 1.labile 2.foliar 3.root *4.wood 5.litter 6.som 7.leaf_N 8.stem_N 9.root_N 10.litter_N 11.som_N    
 ! ----------------------------------------------------------------------------------------------------------------                 
-!                                                             ! PARAMETERS: 
+! ----------------------------------------------------------  ! PARAMETERS: 
 !          FLUXES (daily):                                    ! 1.  Decomposition rate
 !          1.GPP                                              ! 2.  Fraction of GPP respired 
 !          2.temprate                                         ! 3.  GSI sens for leaf growth
