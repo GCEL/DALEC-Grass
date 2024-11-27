@@ -1,52 +1,64 @@
-! grassland model developed from DALEC_GIS_DFOL_FR
+! Grassland biogeochemistry model 
+! Development version that includes Nitrogen cycling 
 ! ----------------------------------------------------------------------------------------------------------------
-! POOLS:   1.labile 2.foliar 3.root                        ! PARAMETERS:
-!         *4.wood   5.litter 6.som                         !
-! ------------------------------------------               ! 1.Decomposition rate
-! FLUXES:  1.GPP                                           ! 2.Fraction of GPP respired 
-! (daily)  2.temprate                                      ! 3.GSI sens for leaf growth
-!          3.respiration_auto                              ! 4.NPP belowground allocation parameter
-!          4.leaf production                               ! 5.GSI max leaf turnover 
-!          5.labile production                             ! 6.TOR roots
-!          6.root production                               ! 7.TOR litter
-!          7.aboveground production                        ! 8.TOR SOM
-!          8.labile consumption -> leaves                  ! 9.Temp factor Q10 (1.2-1.6)
-!          9.leaffall factor                               ! 10.Photosynthetic N use efficiency
-!          10.leaf litter production                       ! 11.GSI max labile turnover
-!         *11.woodlitter production                        ! 12.GSI min temperature threshold (K)
-!          12.rootlitter production                        ! 13.GSI max temperature threshold (K)
-!          13.respiration het litter                       ! 14.GSI min photoperiod threshold (sec)
-!          14.respiration het som                          ! 15.LCA - g.C.leaf_m-2
-!          15.litter2som                                   ! 16.C labile (initialization)
-!          16.labrelease factor(leaf growth)               ! 17.C foliar (initialization)
-!         *17.carbon flux due to fire                      ! 18.C roots  (initialization)
-!          18.growing season index                         ! 19.C litter (initialization)
-!          19.animal manure C soil input (per time step)   ! 20.GSI max photoperiod threshold (sec)
-!          20.animal resp co2 (per time step)              ! 21.GSI min VPD threshold (Pa) 
-!          21.animal ch4 (per time step)                   ! 22.GSI max VPD threshold (Pa)
-! ------------------------------------------               ! 23.critical GPP for LAI increase (gC.m-2.day-1)
-! MET:     1.run day                                       ! 24.GSI senstivity for leaf senescence 
-!          2.min T (C)                                     ! 25.GSI - have I just left a growing state (>1)
-!          3.max T (C)                                     ! 26.GSI - initial GSI value 
-!          4.Radiation (MJ.m-2)                            ! 27.DM min lim for grazing (kg.DM.ha-1)
-!          5.CO2 (ppm)                                     ! 28.DM min lim for cutting (kg.DM.ha-1)
-!          6.DOY                                           ! 29.leaf-vs-stem allocation factor 
-!         *7.lagged precip                                 ! 30.C SOM (initialization)
-!          8.cutting/grazing :                             ! 31.DM demand of animal weight (fraction)
-!            - spatial mode = lai removed (m2.m-2)         ! 32.Post-grazing labile loss (fraction)
-!            - field mode = LSU.ha-1                       ! 33.Post-cut labile loss (fraction)
-!         *9.burnt area fraction                           ! 34.Cut detection parameter (LAI reduction m2.m-2 see met(8))
-!          10.21-day avg min T (K)        
-!          11.21-day avg photoperiod (sec) 
-!          12.21-day avg VPD (Pa)         
-!         *13.Forest mgmt after clearing
-!         *14.Mean T
+! POOLS: 1.labile 2.foliar 3.root *4.wood 5.litter 6.som 7.leaf_N 8.stem_N 9.root_N 10.litter_N 11.som_N    
+! ----------------------------------------------------------------------------------------------------------------                 
+!                                                             ! PARAMETERS: 
+!          FLUXES (daily):                                    ! 1.  Decomposition rate
+!          1.GPP                                              ! 2.  Fraction of GPP respired 
+!          2.temprate                                         ! 3.  GSI sens for leaf growth
+!          3.respiration_auto                                 ! 4.  NPP belowground allocation parameter
+!          4.leaf production                                  ! 5.  GSI max leaf turnover 
+!          5.labile production                                ! 6.  TOR roots
+!          6.root production                                  ! 7.  TOR litter
+!          7.aboveground production                           ! 8.  TOR SOM
+!          8.labile consumption -> leaves                     ! 9.  Temp factor Q10 (1.2-1.6)
+!          9.leaffall factor                                  ! 10. Photosynthetic N use efficiency
+!          10.leaf litter production                          ! 11. GSI max labile turnover
+!         *11.woodlitter production                           ! 12. GSI min temperature threshold (K)
+!          12.rootlitter production                           ! 13. GSI max temperature threshold (K)
+!          13.respiration het litter                          ! 14. GSI min photoperiod threshold (sec)
+!          14.respiration het som                             ! 15. LCA - g.C.leaf_m-2
+!          15.litter2som                                      ! 16. C labile (initialization)
+!          16.labrelease factor(leaf growth)                  ! 17. C foliar (initialization)
+!         *17.carbon flux due to fire                         ! 18. C roots  (initialization)
+!          18.growing season index                            ! 19. C litter (initialization)
+!          19.animal manure C soil input (per time step)      ! 20. GSI max photoperiod threshold (sec)
+!          20.animal resp co2 (per time step)                 ! 21. GSI min VPD threshold (Pa) 
+!          21.animal ch4 (per time step)                      ! 22. GSI max VPD threshold (Pa)
+!          22.litter N loss to atm                            ! 23. critical GPP for LAI increase (gC.m-2.day-1)
+!          23.litter N loss to SOM                            ! 24. GSI senstivity for leaf senescence
+!          24.fertiliser-N use                                ! 25. GSI - have I just left a growing state (>1)
+!          25.labile to leaf N                                ! 26. GSI - initial GSI value 
+!          26.leaf litter N                                   ! 27. DM min lim for grazing (kg.DM.ha-1)
+!          27.root litter N                                   ! 
+!          28.som N loss to atm                               ! 28. DM min lim for cutting (kg.DM.ha-1)
+! ------------------------------------------                  ! 29. leaf-vs-stem allocation factor
+!          DRIVERS:                                           ! 30. C SOM (initialization) 
+!          1.run day                                          ! 31. DM demand of animal weight (fraction)
+!          2.min T (C)                                        ! 32. Post-grazing labile loss (fraction)
+!          3.max T (C)                                        ! 33. Post-cut labile loss (fraction)
+!          4.Radiation (MJ.m-2)                               ! 34. Minimum grazed biomass to allow grazing
+!          5.CO2 (ppm)                                        ! 35. Harvest leaf % reduction 
+!          6.DOY                                              ! 36. grazed N return to litter (fraction 0.3-0.6) 
+!         *7.lagged precip                                    ! 
+!          8.cutting/grazing :                                ! 
+!            - spatial mode = lai removed (m2.m-2)            ! 
+!            - field mode = LSU.ha-1                          ! 
+!         *9.burnt area fraction                              ! 
+!          10.21-day avg min T (K)                            ! 
+!          11.21-day avg photoperiod (sec)                    !
+!          12.21-day avg VPD (Pa)                             !
+!         *13.Forest mgmt after clearing                      !
+!         *14.Mean T                                          !
 ! ----------------------------------------------------------------------------------------------------------------
 ! NOTES : '*' above means not used/applicable for grasslands 
 !         1 LSU per ha = 1 cow that weighs 650kg and grazes on 1 ha of grassland 
 !         carbon = 0.475 * dry matter 
 !         1 g.C.m-2 = 1 * 0.021 t.DM.ha-1
+!         to compile this .f90 into a python shared object (.so) run: f2py -c DALEC_GRASS.f90 -m DALEC_GRASS
 ! ----------------------------------------------------------------------------------------------------------------
+
 
 module CARBON_MODEL_MOD
 
@@ -118,9 +130,6 @@ contains
 
     double precision, intent(out) :: REMOVED_C(2,nodays) ! vector of removed C (grazed,cut)
     
-    ! following two lines needed to compile this .f90 into a python-readable .so 
-    ! compile by running 'f2py -c DALEC_GRASS.f90 -m DALEC_GRASS' 
-
     !f2py intent(in) :: start, finish, deltat, lat, met, pars, nodays, nopars, nomet, nopools, nofluxes, version_code   
 
     !f2py intent(out) :: LAI, GPP, NEE, POOLS, FLUXES, REMOVED_C
@@ -139,13 +148,19 @@ contains
                        ,roots_residue                 & 
                        ,labile_frac_res               &
                        ,tot_abg_exp,fol_frac,lab_frac &
-                       ,f_root,NPP                
+                       ,f_root,NPP                    & 
+                       ,leafCN,stemCN                 &
+                       ,rootCN,litterCN,somCN         & 
+                       ,leafN_demand,stemN_demand     &
+                       ,rootsN_demand,sumN_demand     &
+                       ,leafN_excess,stemN_excess     &
+                       ,rootsN_excess,sumN_excess
 
 
     integer :: gsi_lag
 
     ! load some values
-    gpppars(4) = 2.0  ! g N leaf_m-2
+    ! gpppars(4) = 2.0  ! g N leaf_m-2
     gpppars(7) = lat
     gpppars(9) = -2.0 ! leafWP-soilWP
     gpppars(10) = 1.0 ! totaly hydraulic resistance
@@ -164,19 +179,25 @@ contains
     constants(10)=0.789798
 
     ! post-removal residues and root death | 0:none 1:all
-    foliage_frac_res  = 0.05  ! fraction of removed foliage that goes to litter
-    labile_frac_res   = 0.05  ! fraction of removed labile that goes to litter
-    roots_frac_death  = 0.01  ! fraction of roots that dies and goes to litter
+    foliage_frac_res  = 0.05  ! fraction of removed foliage that goes to litter
+    labile_frac_res   = 0.05  ! fraction of removed labile that goes to litter
+    roots_frac_death  = 0.01  ! fraction of roots that dies and goes to litter
 
     if (start == 1) then
 
         ! assigning initial conditions
-        POOLS(1,1) = pars(16)
-        POOLS(1,2) = pars(17)
-        POOLS(1,3) = pars(18)
-        POOLS(1,4) = 0 ! no wood pools in grasslands
-        POOLS(1,5) = pars(19)
-        POOLS(1,6) = pars(30)
+        POOLS(1,1)  = pars(16) ! stem C 
+        POOLS(1,2)  = pars(17) ! leaf C 
+        POOLS(1,3)  = pars(18) ! root C 
+        POOLS(1,4)  = 0        ! no wood pools in grasslands
+        POOLS(1,5)  = pars(19) ! litter C  
+        POOLS(1,6)  = pars(30) ! SOM C 
+        POOLS(1,7)  = POOLS(1,2) / 15  ! leaf N=C/CN
+        POOLS(1,8)  = POOLS(1,1) / 30  ! stem N=C/CN
+        POOLS(1,9)  = POOLS(1,3) / 40  ! roots N=C/CN
+        POOLS(1,10) = POOLS(1,5) / 10  ! litter N=C/CN
+        POOLS(1,11) = POOLS(1,6) / 50  ! SOM N=C/CN (assuming very high C:N)
+
 
         ! calculate some values once as these are invarient between DALEC runs
         if (.not.allocated(tmp_x)) then
@@ -233,12 +254,13 @@ contains
       LAI(n) = POOLS(n,2) / LMA 
 
       ! load next met / lai values for ACM
-      gpppars(1)=LAI(n)   ! LAI
-      gpppars(2)=met(3,n) ! max temp
-      gpppars(3)=met(2,n) ! min temp
-      gpppars(5)=met(5,n) ! co2
-      gpppars(6)=ceiling(met(6,n)-(deltat(n)*0.5)) ! doy
-      gpppars(8)=met(4,n) ! radiation
+      gpppars(1) = LAI(n)   ! LAI
+      gpppars(2) = met(3,n) ! max temp
+      gpppars(3) = met(2,n) ! min temp
+      gpppars(4) = POOLS(n,2)*0.085 / LAI(n) ! g.N.leaf_m-2 : LNA = leaf_N/LAI  (leaf_N = leaf_C * 0.085)
+      gpppars(5) = met(5,n) ! co2
+      gpppars(6) = ceiling(met(6,n)-(deltat(n)*0.5)) ! doy
+      gpppars(8) = met(4,n) ! radiation
 
       ! GPP (gC.m-2.day-1)
       if (LAI(n) > 0.) then
@@ -285,6 +307,7 @@ contains
       
       ! labile consumption
       FLUXES(n,8) = 0.0
+
 
       ! Calculate the Growing Season Index based on Jolly et al. 
       ! doi: 10.1111/j.1365-2486.2005.00930.x doi:10.1029/2010JG001545.
@@ -374,77 +397,94 @@ contains
          end if ! Just grown?
       endif ! gradient choice
 
+      ! C:N ratio of pools 
+      leafCN   = POOLS(n,2) / POOLS(n,7)
+      stemCN   = POOLS(n,1) / POOLS(n,8)
+      rootCN   = POOLS(n,3) / POOLS(n,9)
+      litterCN = POOLS(n,5) / POOLS(n,10)
+      somCN    = POOLS(n,6) / POOLS(n,11)
 
       ! FLUXES WITH TIME DEPENDENCIES
 
-      ! labile release = P_labile * (1-(1-leafgrowth)**deltat)/deltat
-      FLUXES(n,8)  = POOLS(n,1)*(1.-(1.-FLUXES(n,16))**deltat(n))/deltat(n)
       ! leaf litter production = P_foliar * (1-(1-leaffall)**deltat)/deltat  
       FLUXES(n,10) = POOLS(n,2)*(1.-(1.-FLUXES(n,9))**deltat(n))/deltat(n)
-      !  wood litter production
-      FLUXES(n,11) = 0
-      !  root litter production = P_root * (1-(1-rootTOR)**deltat)/deltat  
+      FLUXES(n,26) = FLUXES(n,10) / leafCN
+      ! labile release = P_labile * (1-(1-leafgrowth)**deltat)/deltat
+      FLUXES(n,8)  = POOLS(n,1)*(1.-(1.-FLUXES(n,16))**deltat(n))/deltat(n)
+      FLUXES(n,25) = FLUXES(n,8) / stemCN
+      ! root litter production = P_root * (1-(1-rootTOR)**deltat)/deltat  
       FLUXES(n,12) = POOLS(n,3)*(1.-(1.-pars(6))**deltat(n))/deltat(n)
+      FLUXES(n,27) = FLUXES(n,12) / rootCN
+      ! wood litter production
+      FLUXES(n,11) = 0
 
-      ! FLUXES WITH TEMP AND TIME DEPENDENCIES
+      ! FLUXES WITH TEMPERATURE AND TIME DEPENDENCIES
 
       ! resp het litter = P_litter * (1-(1-GPP_respired*litterTOR)**deltat)/deltat  
       FLUXES(n,13) = POOLS(n,5)*(1.-(1.-FLUXES(n,2)*pars(7))**deltat(n))/deltat(n)
+      FLUXES(n,22) = FLUXES(n,13) / litterCN
       ! resp het som = P_som * (1-(1-GPP_respired*somTOR)**deltat)/deltat
       FLUXES(n,14) = POOLS(n,6)*(1.-(1.-FLUXES(n,2)*pars(8))**deltat(n))/deltat(n)
+      FLUXES(n,28) = FLUXES(n,14) / somCN
       ! litter to som = P_litter * (1-(1-dec_rate*temprate)**deltat)/deltat
       FLUXES(n,15) = POOLS(n,5)*(1.-(1.-pars(1)*FLUXES(n,2))**deltat(n))/deltat(n)
+      FLUXES(n,23) = FLUXES(n,15) / litterCN
 
       ! NEE = resp_auto + resp_het_litter + resp_het_som - GPP [i.e. '-' when CO2 sink '+' when CO2 source ]
       NEE(n) = (FLUXES(n,3) + FLUXES(n,13) + FLUXES(n,14)) - FLUXES(n,1)
       ! GPP 
       GPP(n) = FLUXES(n,1)
 
-      ! update pools for next timestep
+      ! UODATE POOLS FOR NEXT TIME STEP
 
-      ! labile pool = labile_pool[†-1] + (lab_prod - lab_cons)*deltat
-      POOLS(n+1,1) = POOLS(n,1) + (FLUXES(n,5)-FLUXES(n,8))*deltat(n)
       !  foliar pool = foliar_pool[†-1] + (leaf_prod - leaf_litter_prod + lab_prod2)*deltat
       POOLS(n+1,2) = POOLS(n,2) + (FLUXES(n,4)-FLUXES(n,10) + FLUXES(n,8))*deltat(n)
-      ! wood pool
-      POOLS(n+1,4) = 0.0
+      POOLS(n+1,7) = POOLS(n,7) + (FLUXES(n,25) - FLUXES(n,26))*deltat(n) ! N leaf litter and from-stem transfer
+      ! labile pool = labile_pool[†-1] + (lab_prod - lab_cons)*deltat
+      POOLS(n+1,1) = POOLS(n,1) + (FLUXES(n,5)-FLUXES(n,8))*deltat(n)
+      POOLS(n+1,8) = POOLS(n,8) - (FLUXES(n,25))*deltat(n) ! N transfer to leaf
       ! root pool = root_pool[†-1] + (root_prod - root_litter_prod)*deltat
       POOLS(n+1,3) = POOLS(n,3) + (FLUXES(n,6)-FLUXES(n,12))*deltat(n)
+      POOLS(n+1,9) = POOLS(n,9) - (FLUXES(n,27))*deltat(n) ! root litter production
       ! litter pool = litter_pool[†-1] + (leaf_litter_prod + root_litter_prod - resp_het_litter - litter2som)*deltat
       POOLS(n+1,5) = POOLS(n,5) + (FLUXES(n,10)+FLUXES(n,12)-FLUXES(n,13)-FLUXES(n,15))*deltat(n)
+      POOLS(n+1,10) = POOLS(n,10) + (FLUXES(n,26)+FLUXES(n,27)-FLUXES(n,22)-FLUXES(n,23))*deltat(n) ! fluxes to atm and SOM     
       ! som pool = som_pool[†-1] + (litter2som - resp_het_som + wood_litter_prod)
       POOLS(n+1,6) = POOLS(n,6) + (FLUXES(n,15)-FLUXES(n,14)+FLUXES(n,11))*deltat(n)
+      POOLS(n+1,11) = POOLS(n,11) + (FLUXES(n,23)-FLUXES(n,28))*deltat(n)
+      ! wood pool
+      POOLS(n+1,4) = 0.0 
 
-
-      ! 
-      ! SPATIAL MODE 
-      ! 
+      ! ------------------------------------------------------------------------------------------------------------- ! 
+      !                                              SPATIAL MODE                                                     !
+      ! ------------------------------------------------------------------------------------------------------------- ! 
 
       if (version_code .EQ. 1) then 
-
-        ! CUTTING 
-
-        !if current ABG biomass > pre-cutting limit & is between April-October & LAI reduction driver > pars(34) & no cut in previous month
-        if ( ( (POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(28)*0.475*0.1) )  & 
-             .AND. ( met(6,n) .GE. 90 ) .AND. ( met(6,n) .LE. 304 ) & 
-             .AND. ( met(8,n) .GE. pars(34) ) &
+        
+      ! CUTTING 
+      ! ------------------------------------------------------------------------------------------------------------- ! 
+        
+        ! conditions for considering weekly LAI reduction as possible cutting 
+        if ( ((POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(28)*0.0475))   & ! AGB > precutting limit 
+             .AND. ( met(6,n) .GE. 120 ) .AND. ( met(6,n) .LE. 273 ) & !  May > date > Sept
+             .AND. ( LAI(n) .GE. 3 ) & ! LAI >= 3 m2.m-2
+             .AND. ( (met(8,n) * LMA * 0.021) .GE. 1 ) & ! removed leaf tDMha-1 > 1 
              .AND. (REMOVED_C(2,n-1) .EQ. 0.0) .AND. (REMOVED_C(2,n-2) .EQ. 0.0 ) &
              .AND. (REMOVED_C(2,n-3) .EQ. 0.0) .AND. (REMOVED_C(2,n-4) .EQ. 0.0 ) ) then
 
-            ! direct C losses
-            labile_loss  = POOLS(n+1,1) * pars(33)
-            ! foliar_loss  = max(0.,POOLS(n+1,2) - (pars(27)*0.475*0.1 + labile_loss))
-            foliar_loss  = POOLS(n+1,2) * 0.95 ! 95% of leaves lost after cutting probably 99% lost in reality 
+            ! direct C lossess
+            labile_loss  = POOLS(n+1,1) * pars(33) ! % of stem biomass lost after cutting 
+            foliar_loss  = POOLS(n+1,2) * pars(35) ! % of leaf biomass lost after cutting 
             roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death ! allocation to roots will be reduced due to reduced LAI 
 
             ! fraction of harvest wasted 
             labile_residue = labile_loss * labile_frac_res
             foliar_residue = foliar_loss * foliage_frac_res
              
-            ! if havest yields > 1500 kg.DM.ha-1 then proceed with cut 
-            if ( ((foliar_loss-foliar_residue)+(labile_loss-labile_residue)) .GE. (1500*0.475*0.1) ) then
+            ! ! if havest yields > 1500 kg.DM.ha-1 proceed with cut -- else do not simulate
+            if ( ((foliar_loss-foliar_residue)+(labile_loss-labile_residue)) .GE. (1500*0.0475) ) then
               
-              ! extracted carbon via cutting
+              ! extracted C via cutting
               REMOVED_C(2,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue)
 
               ! update pools 
@@ -454,36 +494,40 @@ contains
               POOLS(n+1,4) = 0.0
               POOLS(n+1,5) = max(0., POOLS(n+1,5) + (labile_residue+foliar_residue+roots_loss))
               POOLS(n+1,6) = max(0., POOLS(n+1,6))
-
+              POOLS(n+1,7) = POOLS(n+1,7) - foliar_loss/leafCN ! leaf N after grazing
+              POOLS(n+1,8) = POOLS(n+1,8) - labile_loss/stemCN ! stem N after grazing
+              POOLS(n+1,10) = POOLS(n+1,10) + foliar_residue/leafCN + labile_residue/stemCN ! litter N after plant residues addition 
+                                 
             endif 
 
         endif ! end cutting process   
+        
+      ! GRAZING 
+      ! ------------------------------------------------------------------------------------------------------------- ! 
 
-        ! GRAZING 
-
-        ! if LAI reduction driver > 0 & ABG biomass > pre-grazing limit & no cutting this, 1 and 2 weeks before
-        if ( (met(8,n) > 0.) .AND. ( (POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(27)*0.475*0.1) ) & 
-            .AND. (REMOVED_C(2,n) .EQ. 0.0) .AND. (REMOVED_C(2,n-1) .EQ. 0.0) .AND. (REMOVED_C(2,n-2) .EQ. 0.0) ) then
+        ! conditions to consider LAI reduction as possible grazing         
+        if ( ( (POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(27)*0.0475) )  & ! AGB > pregraze limit
+           .AND. (met(8,n) .GE. 0) & ! LAI removal > 0 
+           .AND. (met(2,n) .GE. 5) & ! min_T > 5C 
+           .AND. (REMOVED_C(2,n) .EQ. 0.0) ) then ! no cut this week 
             
             ! direct C losses
             labile_loss  = POOLS(n+1,1) * pars(32)
-            foliar_loss  = max(0.,met(8,n) * LMA - labile_loss)
+            foliar_loss  = max(0.,(met(8,n) * LMA) - labile_loss) 
             roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
 
             ! fraction of harvest wasted 
             labile_residue = labile_loss * labile_frac_res
             foliar_residue = foliar_loss * foliage_frac_res
 
-            ! extracted C via grazing (if remaining ABG biomass > pre-grazing limit DM & grazed biomass > ~0.5g.C.m-2 )
-            ! minimum grazed biomass based on North Wyke data (winter sheep grazing)            
-            if ( (((POOLS(n+1,2)+POOLS(n+1,1))-foliar_loss-labile_loss) .GE. (pars(27)*0.475*0.1)) & 
-                .AND. ((foliar_loss+labile_loss) .GE. pars(35)) ) then
+            ! extracted C via grazing: if remaining AGB > pre-grazing limit DM & grazed biomass > pars(34) g.C.m-2          
+            if ( (((POOLS(n+1,2)+POOLS(n+1,1))-foliar_loss-labile_loss) .GE. (pars(27)*0.0475)) & 
+                .AND. ((foliar_loss+labile_loss) .GE. pars(34)) ) then
                 
                 ! extracted C via grazing
                 REMOVED_C(1,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue)
                  
-                ! constants used for animal C fluxes based on various studies 
-                ! incl Vertes.et.al.2019 (10.1016/B978-0-12-811050-8.00002-9)
+                ! constants used for animal C fluxes from Vertes.et.al.2019 (10.1016/B978-0-12-811050-8.00002-9)
                 
                 ! animal manure-C production
                 FLUXES(n,19) = REMOVED_C(1,n) * 0.32
@@ -501,136 +545,32 @@ contains
                 POOLS(n+1,4) = 0.0
                 POOLS(n+1,5) = max(0., POOLS(n+1,5) + (labile_residue+foliar_residue+roots_loss) + FLUXES(n,19))
                 POOLS(n+1,6) = max(0., POOLS(n+1,6))
-            endif 
-
-            ! extracted C via grazing (if not done above & remaining ABG biomass < pre-grazing limit DM )
-            if ( (REMOVED_C(1,n) .EQ. 0.0) .AND. & 
-               (((POOLS(n+1,2)+POOLS(n+1,1))-foliar_loss-labile_loss) .LE. (pars(27)*0.475*0.1)) ) then
-                
-                ! direct C losses
-                labile_loss  = POOLS(n+1,1) * pars(32)
-                foliar_loss  = POOLS(n+1,2) - (pars(27)*0.475*0.1 + labile_loss)
-                roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
-
-                ! proceed if simulating this grazing will lead to > ~0.5 gCm-2 removed from ABG pool 
-                if ((foliar_loss+labile_loss) .GE. pars(35)) then
-
-                  ! fraction of harvest wasted 
-                  labile_residue = labile_loss * labile_frac_res
-                  foliar_residue = foliar_loss * foliage_frac_res
-
-                  ! extracted carbon via grazing
-                  REMOVED_C(1,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue)
-
-                  ! animal manure-C production
-                  FLUXES(n,19) = REMOVED_C(1,n) * 0.32
-                  
-                  ! animal respiration CO2-C
-                  FLUXES(n,20) = REMOVED_C(1,n) * 0.54 
-
-                  ! animal CH4-C 
-                  FLUXES(n,21) = REMOVED_C(1,n) * 0.04 
-
-                  ! update pools 
-                  POOLS(n+1,1) = max(0.,POOLS(n+1,1)-labile_loss)
-                  POOLS(n+1,2) = max(0.,POOLS(n+1,2)-foliar_loss)
-                  POOLS(n+1,3) = max(0.,POOLS(n+1,3)-roots_loss)
-                  POOLS(n+1,4) = 0.0
-                  POOLS(n+1,5) = max(0., POOLS(n+1,5) + (labile_residue+foliar_residue+roots_loss) + FLUXES(n,19) )
-                  POOLS(n+1,6) = max(0., POOLS(n+1,6))
-                endif 
-
-            endif 
-
-        endif ! end grazing process
-      
-      endif ! end version_code check 
-
-
-      ! 
-      ! FIELD MODE 
-      ! 
-
-      if (version_code .EQ. 2) then 
-
-        ! CUTTING (if : AGB > cutting limit & met(8,n) = 100 i.e. cutting code)
-        if ( ((POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(28)*0.475*0.1)) .AND. (met(8,n) .EQ. 100) ) then
-                                                                   
-            ! direct C losses
-            labile_loss  = POOLS(n+1,1) * pars(33)
-            foliar_loss  = max(0.,POOLS(n+1,2) - (pars(27)*0.475*0.1 + labile_loss))
-            roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
-
-            ! fraction of harvest wasted 
-            labile_residue = labile_loss * labile_frac_res
-            foliar_residue = foliar_loss * foliage_frac_res
-
-            ! extracted carbon via cutting
-            REMOVED_C(2,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue)
-
-            ! update pools 
-            POOLS(n+1,1) = max(0.,POOLS(n+1,1)-labile_loss)
-            POOLS(n+1,2) = max(0.,POOLS(n+1,2)-foliar_loss)
-            POOLS(n+1,3) = max(0.,POOLS(n+1,3)-roots_loss)
-            POOLS(n+1,4) = 0.0
-            POOLS(n+1,5) = max(0., POOLS(n+1,5) + (labile_residue+foliar_residue+roots_loss))
-            POOLS(n+1,6) = max(0., POOLS(n+1,6))
-
-        endif ! end cutting 
-
-        ! GRAZING (if LSU.ha-1 > 0 & AGB > limit )
-        if ( (met(8,n) > 0.0) .AND. (met(8,n) .NE. 100 ) .AND. ((POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(27)*0.475*0.1)) ) then
+                POOLS(n+1,7) = POOLS(n+1,7) - foliar_loss/leafCN ! leaf N after grazing
+                POOLS(n+1,8) = POOLS(n+1,8) - labile_loss/stemCN ! stem N after grazing
+                ! litter N after plant residues and livestock manure/urine additions   
+                POOLS(n+1,10) = POOLS(n+1,10) + foliar_residue/leafCN + labile_residue/stemCN & 
+                              + pars(37)*((labile_loss-labile_residue)/stemCN + (foliar_loss-foliar_residue)/leafCN)               
             
-            ! direct C losses
-            labile_loss  = POOLS(n+1,1) * pars(32)
-            ! Remove demand (g.C.m-2) from foliage : LSU.per.ha * 650 kg_weight * 2.5% * convert_kg.DM.ha-1_to_g.C.m-2 
-            foliar_loss  = max(0.,met(8,n) * 650 * pars(31) * 0.047619 - labile_loss)
-            roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
-
-            ! fraction of harvest wasted 
-            labile_residue = labile_loss * labile_frac_res
-            foliar_residue = foliar_loss * foliage_frac_res
-
-            ! extracted carbon via grazing (if grass remains  > grazing limit DM )
-            if ( ((POOLS(n+1,2)+POOLS(n+1,1))-foliar_loss-labile_loss) .GE. (pars(27)*0.475*0.1) ) then
-                
-                ! extracted carbon via grazing
-                REMOVED_C(1,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue)
-
-                ! animal manure-C production
-                FLUXES(n,19) = REMOVED_C(1,n) * 0.32
-                
-                ! animal respiration CO2-C
-                FLUXES(n,20) = REMOVED_C(1,n) * 0.54 
-
-                ! animal CH4-C 
-                FLUXES(n,21) = REMOVED_C(1,n) * 0.04 
-
-                ! update pools 
-                POOLS(n+1,1) = max(0.,POOLS(n+1,1)-labile_loss)
-                POOLS(n+1,2) = max(0.,POOLS(n+1,2)-foliar_loss)
-                POOLS(n+1,3) = max(0.,POOLS(n+1,3)-roots_loss)
-                POOLS(n+1,4) = 0.0
-                POOLS(n+1,5) = max(0., POOLS(n+1,5) + (labile_residue+foliar_residue+roots_loss) + FLUXES(n,19) )
-                POOLS(n+1,6) = max(0., POOLS(n+1,6))
             endif 
 
-            ! extracted carbon via grazing (if grass remains  < grazing limit DM )
-            if ( (REMOVED_C(1,n) .EQ. 0.0) .AND. ((POOLS(n+1,2)+POOLS(n+1,1))-foliar_loss-labile_loss) < (pars(27)*0.475*0.1) ) then
-
+            ! extracted C via grazing: if not done above & postgraze AGB < pre-grazing AGB 
+            if ( (REMOVED_C(1,n) .EQ. 0.0) .AND. & 
+               (((POOLS(n+1,2)+POOLS(n+1,1))-foliar_loss-labile_loss) .LE. (pars(27)*0.0475)) ) then
+                
                 ! direct C losses
                 labile_loss  = POOLS(n+1,1) * pars(32)
-                foliar_loss  = POOLS(n+1,2) - (pars(27)*0.475*0.1 + labile_loss)
+                foliar_loss  = POOLS(n+1,2) - (pars(27)*0.0475 + labile_loss)
                 roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
 
-                if (foliar_loss > 0.1 ) then
+                ! proceed if simulating this grazing will remove > pars(34) g.C.m-2          
+                if ((foliar_loss+labile_loss) .GE. pars(34)) then
 
                   ! fraction of harvest wasted 
                   labile_residue = labile_loss * labile_frac_res
                   foliar_residue = foliar_loss * foliage_frac_res
 
                   ! extracted carbon via grazing
-                  REMOVED_C(1,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue)
+                  REMOVED_C(1,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue) 
 
                   ! animal manure-C production
                   FLUXES(n,19) = REMOVED_C(1,n) * 0.32
@@ -648,6 +588,11 @@ contains
                   POOLS(n+1,4) = 0.0
                   POOLS(n+1,5) = max(0., POOLS(n+1,5) + (labile_residue+foliar_residue+roots_loss) + FLUXES(n,19) )
                   POOLS(n+1,6) = max(0., POOLS(n+1,6))
+                  POOLS(n+1,7) = POOLS(n+1,7) - foliar_loss/leafCN ! leaf N after grazing
+                  POOLS(n+1,8) = POOLS(n+1,8) - labile_loss/stemCN ! stem N after grazing
+                  ! litter N after plant residues and livestock manure/urine additions   
+                  POOLS(n+1,10) = POOLS(n+1,10) + foliar_residue/leafCN + labile_residue/stemCN & 
+                                + pars(37)*((labile_loss-labile_residue)/stemCN + (foliar_loss-foliar_residue)/leafCN)                        
                 endif 
 
             endif 
@@ -655,6 +600,163 @@ contains
         endif ! end grazing process
       
       endif ! end version_code check 
+      
+
+      ! PLANT N EXCESS/DEMAND AND SOIL N UPTAKE 
+
+      leafN_excess  = 0
+      stemN_excess  = 0
+      rootsN_excess = 0 
+
+      ! N demand per tissue 
+      leafN_demand  = (POOLS(n+1,2)/15) - POOLS(n+1,7) 
+      stemN_demand  = (POOLS(n+1,1)/30) - POOLS(n+1,8) 
+      rootsN_demand = (POOLS(n+1,3)/40) - POOLS(n+1,9) 
+
+      ! N excess per tissue 
+      if (leafN_demand < 0 ) then 
+        leafN_excess = abs(leafN_demand)
+        leafN_demand = 0 
+      endif 
+      if (stemN_demand < 0 ) then 
+        stemN_excess = abs(stemN_demand)
+        stemN_demand = 0
+      endif 
+      if (rootsN_demand < 0 ) then
+        rootsN_excess = abs(rootsN_demand)
+        rootsN_demand = 0
+      endif 
+      
+      ! total plant N demand
+      sumN_demand = leafN_demand + stemN_demand + rootsN_demand
+      sumN_excess = leafN_excess + stemN_excess + rootsN_excess
+      
+      ! if there is N demand and litter N can cover it without exceeding litter C:N=20 proceed with filling the demand 
+      if ( (sumN_demand > 0) ) then 
+            POOLS(n+1,10) = POOLS(n+1,10) - sumN_demand + sumN_excess
+            POOLS(n+1,7)  = POOLS(n+1,7) + leafN_demand - leafN_excess
+            POOLS(n+1,8)  = POOLS(n+1,8) + stemN_demand - stemN_excess
+            POOLS(n+1,9)  = POOLS(n+1,9) + rootsN_demand - rootsN_excess
+      endif 
+      
+      ! if litter C:N > 20 -> litter C:N=7 with fertiliser application
+      if (POOLS(n+1,5)/(POOLS(n+1,10)) .GE. 15)  then 
+         FLUXES(n+1,24) = (POOLS(n+1,5)/7) - POOLS(n+1,10) ! fertiliser N g.N.m-2
+         POOLS(n+1,10) = POOLS(n+1,10) + FLUXES(n+1,24)
+      endif  
+
+      if (POOLS(n+1,5)/(POOLS(n+1,10)) < 15)  then 
+         FLUXES(n+1,24) = 0 ! fertiliser N = 0 g.N.m-2
+      endif  
+
+      ! ------------------------------------------------------------------------------------------------------------- ! 
+      !                                              FIELD MODE                                                       !
+      ! ------------------------------------------------------------------------------------------------------------- ! 
+
+      ! if (version_code .EQ. 2) then 
+
+      !   ! CUTTING (if : AGB > cutting limit & met(8,n) = 100 i.e. cutting code)
+      !   if ( ((POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(28)*0.0475)) .AND. (met(8,n) .EQ. 100) ) then
+                                                                   
+      !       ! direct C losses
+      !       labile_loss  = POOLS(n+1,1) * pars(33)
+      !       foliar_loss  = max(0.,POOLS(n+1,2) - (pars(27)*0.0475 + labile_loss))
+      !       roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
+
+      !       ! fraction of harvest wasted 
+      !       labile_residue = labile_loss * labile_frac_res
+      !       foliar_residue = foliar_loss * foliage_frac_res
+
+      !       ! extracted carbon via cutting
+      !       REMOVED_C(2,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue)
+
+      !       ! update pools 
+      !       POOLS(n+1,1) = max(0.,POOLS(n+1,1)-labile_loss)
+      !       POOLS(n+1,2) = max(0.,POOLS(n+1,2)-foliar_loss)
+      !       POOLS(n+1,3) = max(0.,POOLS(n+1,3)-roots_loss)
+      !       POOLS(n+1,4) = 0.0
+      !       POOLS(n+1,5) = max(0., POOLS(n+1,5) + (labile_residue+foliar_residue+roots_loss))
+      !       POOLS(n+1,6) = max(0., POOLS(n+1,6))
+
+      !   endif ! end cutting 
+
+      !   ! GRAZING (if LSU.ha-1 > 0 & AGB > limit )
+      !   if ( (met(8,n) > 0.0) .AND. (met(8,n) .NE. 100 ) .AND. ((POOLS(n+1,2)+POOLS(n+1,1)) .GE. (pars(27)*0.0475)) ) then
+            
+      !       ! direct C losses
+      !       labile_loss  = POOLS(n+1,1) * pars(32)
+      !       ! Remove demand (g.C.m-2) from foliage : LSU.per.ha * 650 kg_weight * 2.5% * convert_kg.DM.ha-1_to_g.C.m-2 
+      !       foliar_loss  = max(0.,met(8,n) * 650 * pars(31) * 0.047619 - labile_loss)
+      !       roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
+
+      !       ! fraction of harvest wasted 
+      !       labile_residue = labile_loss * labile_frac_res
+      !       foliar_residue = foliar_loss * foliage_frac_res
+
+      !       ! extracted carbon via grazing (if grass remains  > grazing limit DM )
+      !       if ( ((POOLS(n+1,2)+POOLS(n+1,1))-foliar_loss-labile_loss) .GE. (pars(27)*0.0475) ) then
+                
+      !           ! extracted carbon via grazing
+      !           REMOVED_C(1,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue)
+
+      !           ! animal manure-C production
+      !           FLUXES(n,19) = REMOVED_C(1,n) * 0.32
+                
+      !           ! animal respiration CO2-C
+      !           FLUXES(n,20) = REMOVED_C(1,n) * 0.54 
+
+      !           ! animal CH4-C 
+      !           FLUXES(n,21) = REMOVED_C(1,n) * 0.04 
+
+      !           ! update pools 
+      !           POOLS(n+1,1) = max(0.,POOLS(n+1,1)-labile_loss)
+      !           POOLS(n+1,2) = max(0.,POOLS(n+1,2)-foliar_loss)
+      !           POOLS(n+1,3) = max(0.,POOLS(n+1,3)-roots_loss)
+      !           POOLS(n+1,4) = 0.0
+      !           POOLS(n+1,5) = max(0., POOLS(n+1,5) + (labile_residue+foliar_residue+roots_loss) + FLUXES(n,19) )
+      !           POOLS(n+1,6) = max(0., POOLS(n+1,6))
+      !       endif 
+
+      !       ! extracted carbon via grazing (if grass remains  < grazing limit DM )
+      !       if ( (REMOVED_C(1,n) .EQ. 0.0) .AND. ((POOLS(n+1,2)+POOLS(n+1,1))-foliar_loss-labile_loss) < (pars(27)*0.0475) ) then
+
+      !           ! direct C losses
+      !           labile_loss  = POOLS(n+1,1) * pars(32)
+      !           foliar_loss  = POOLS(n+1,2) - (pars(27)*0.0475 + labile_loss)
+      !           roots_loss   = 0 ! POOLS(n+1,3) * roots_frac_death
+
+      !           if (foliar_loss > 0.1 ) then
+
+      !             ! fraction of harvest wasted 
+      !             labile_residue = labile_loss * labile_frac_res
+      !             foliar_residue = foliar_loss * foliage_frac_res
+
+      !             ! extracted carbon via grazing
+      !             REMOVED_C(1,n) = (labile_loss-labile_residue) + (foliar_loss-foliar_residue)
+
+      !             ! animal manure-C production
+      !             FLUXES(n,19) = REMOVED_C(1,n) * 0.32
+                  
+      !             ! animal respiration CO2-C
+      !             FLUXES(n,20) = REMOVED_C(1,n) * 0.54 
+
+      !             ! animal CH4-C 
+      !             FLUXES(n,21) = REMOVED_C(1,n) * 0.04 
+
+      !             ! update pools 
+      !             POOLS(n+1,1) = max(0.,POOLS(n+1,1)-labile_loss)
+      !             POOLS(n+1,2) = max(0.,POOLS(n+1,2)-foliar_loss)
+      !             POOLS(n+1,3) = max(0.,POOLS(n+1,3)-roots_loss)
+      !             POOLS(n+1,4) = 0.0
+      !             POOLS(n+1,5) = max(0., POOLS(n+1,5) + (labile_residue+foliar_residue+roots_loss) + FLUXES(n,19) )
+      !             POOLS(n+1,6) = max(0., POOLS(n+1,6))
+      !           endif 
+
+      !       endif 
+
+      !   endif ! end grazing process
+      
+      ! endif ! end version_code check 
 
 
     end do ! nodays loop
